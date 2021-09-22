@@ -80,7 +80,7 @@ class GFTWINT extends GFPaymentAddOn {
 		$ch = curl_init();
 		curl_setopt($ch, CURLOPT_URL, $api_url);
 		curl_setopt($ch, CURLOPT_POST, 1);
-		curl_setopt($ch, CURLOPT_POSTFIELDS, $data);  //Post Fields
+		curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
 		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 
 		$headers = [
@@ -112,7 +112,7 @@ class GFTWINT extends GFPaymentAddOn {
 			"url": "https://test.adyen.link/PL45D0F79183A4CCA2"
 		}
 		*/
-		
+
 		$data_string = json_decode($output, true);
 		$payment_url = $data_string['url'];
 
