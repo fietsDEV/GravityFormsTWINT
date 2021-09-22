@@ -37,31 +37,14 @@ class GFTWINT extends GFPaymentAddOn {
 
 	public function redirect_url( $feed, $submission_data, $form, $entry ) {
 
-		/*
-		curl https://checkout-test.adyen.com/v67/paymentLinks \
-		-H "x-API-key: YOUR_X-API-KEY" \
-		-H "content-type: application/json" \
-		-d '{
-		"reference": "YOUR_PAYMENT_REFERENCE",
-		"amount": {
-			"value": 4200,
-			"currency": "EUR"
-		},
-		"shopperReference": "UNIQUE_SHOPPER_ID_6728",
-		"description": "Blue Bag - ModelM671",
-		"countryCode": "NL",
-		"merchantAccount": "YOUR_MERCHANT_ACCOUNT",
-		"shopperLocale": "nl-NL"
-		}'
-		*/
-
 		// Get Adyen/TWINT Payment URL
 		$api_url = 'API_URL';
 		$api_key = 'YOUR_X-API-KEY';
 		$merch_account = 'YOUR_MERCHANT_ACCOUNT';
 
 		$payment_ref = '123';
-		$payment_value = 1;
+		$payment_value_raw = 1;
+		$payment_value = number_format($payment_value_raw, 2, '.');
 		$buyer_ref = 'UNIQUE_SHOPPER_ID_6728';
 
 		$data = '{
@@ -145,9 +128,6 @@ class GFTWINT extends GFPaymentAddOn {
 			$response = wp_remote_post( $endpoint_url, array( 'body' => $body ) );
 			GFCommon::log_debug( 'gform_after_submission: response => ' . print_r( $response, true ) );
 		}
-
-
-
 
 		$data_string = json_decode($output, true);
 		$payment_url = $data_string['url'];
