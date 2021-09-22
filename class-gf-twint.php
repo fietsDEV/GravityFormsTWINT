@@ -90,11 +90,33 @@ class GFTWINT extends GFPaymentAddOn {
 
 		curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 
-		$output = curl_exec ($ch); // Output
+		$output = curl_exec ($ch);
 
 		curl_close ($ch);
 
-		//return $url;
+		// $output response
+		/*
+		{
+			"amount": {
+				"currency": "EUR",
+				"value": 4200
+			},
+			"countryCode": "NL",
+			"description": "Blue Bag - ModelM671",
+			"expiresAt": "2020-07-25T11:32:20Z",
+			"id": "PL50C5F751CED39G71",
+			"merchantAccount": "YOUR_MERCHANT_ACCOUNT",
+			"reference": "YOUR_PAYMENT_REFERENCE",
+			"shopperLocale": "nl-NL",
+			"shopperReference": "UNIQUE_SHOPPER_ID_6728",
+			"url": "https://test.adyen.link/PL45D0F79183A4CCA2"
+		}
+		*/
+		
+		$data_string = json_decode($output, true);
+		$payment_url = $data_string['url'];
+
+		return $payment_url;
 	}
 
 	public function return_url( $form_id, $lead_id ) {
