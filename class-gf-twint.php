@@ -189,45 +189,6 @@ class GFTWINT extends GFPaymentAddOn {
 
 	}
 
-	protected function authorize( $feed, $submission_data, $form, $entry ) {
-	}
-
-	protected function capture( $authorization, $feed, $submission_data, $form, $entry ) {
-	}
-
 	protected function callback() {
-	}
-
-	public static function maybe_thankyou_page() {
-		$instance = self::get_instance();
-
-		if ( ! $instance->is_gravityforms_supported() ) {
-			return;
-		}
-
-		if ( $str = rgget( 'gf_twint_return' ) ) {
-			$str = base64_decode( $str );
-
-			parse_str( $str, $query );
-			if ( wp_hash( 'ids=' . $query['ids'] ) == $query['hash'] ) {
-				list( $form_id, $lead_id ) = explode( '|', $query['ids'] );
-
-				$form = GFAPI::get_form( $form_id );
-				$lead = GFAPI::get_entry( $lead_id );
-
-				if ( ! class_exists( 'GFFormDisplay' ) ) {
-					require_once( GFCommon::get_base_path() . '/form_display.php' );
-				}
-
-				$confirmation = GFFormDisplay::handle_confirmation( $form, $lead, false );
-
-				if ( is_array( $confirmation ) && isset( $confirmation['redirect'] ) ) {
-					header( "Location: {$confirmation['redirect']}" );
-					exit;
-				}
-
-				GFFormDisplay::$submission[ $form_id ] = array( 'is_confirmation' => true, 'confirmation_message' => $confirmation, 'form' => $form, 'lead' => $lead );
-			}
-		}
 	}
 
