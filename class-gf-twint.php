@@ -33,89 +33,77 @@ class GFTWINT extends GFPaymentAddOn {
 
 
 
-	//------ SENDING TO TWINT -----------//
+	//------ SENDING TO TWINT VIA ADYEN -----------//
 
 	public function redirect_url( $feed, $submission_data, $form, $entry ) {
 
-		//Don't process redirect url if request is a TWINT return
-		if ( ! rgempty( 'gf_twint_return', $_GET ) ) {
-			return false;
-		}
+		/*
+		curl https://checkout-test.adyen.com/v67/paymentLinks \
+		-H "x-API-key: YOUR_X-API-KEY" \
+		-H "content-type: application/json" \
+		-d '{
+		"reference": "YOUR_PAYMENT_REFERENCE",
+		"amount": {
+			"value": 4200,
+			"currency": "EUR"
+		},
+		"shopperReference": "UNIQUE_SHOPPER_ID_6728",
+		"description": "Blue Bag - ModelM671",
+		"countryCode": "NL",
+		"merchantAccount": "YOUR_MERCHANT_ACCOUNT",
+		"shopperLocale": "nl-NL"
+		}'
+		*/
 
-		//updating lead's payment_status to Processing
-		GFAPI::update_entry_property( $entry['id'], 'payment_status', 'Processing' );
+		// Get Adyen/TWINT Payment URL
+		$api_url = 'API_URL';
+		$api_key = 'YOUR_X-API-KEY';
+		$merch_account = 'YOUR_MERCHANT_ACCOUNT';
 
-		//Getting Url (Production or Sandbox)
-		$url = $feed['meta']['mode'] == 'production' ? $this->production_url : $this->sandbox_url;
+		$payment_ref = '123';
+		$payment_value = 1;
+		$buyer_ref = 'UNIQUE_SHOPPER_ID_6728';
 
-		$invoice_id = apply_filters( 'gform_twint_invoice', '', $form, $entry );
+		$data = '{
+			"reference": "'.$payment_ref.'",
+			"amount": {
+				"value": '.$payment_value.',
+				"currency": "CHF"
+			},
+			"shopperReference": "'.$buyer_ref.'",
+			"description": "Spende",
+			"countryCode": "CH",
+			"merchantAccount": "'.$merch_account.'",
+			"shopperLocale": "ch-CH"
+		}';
 
-		$invoice = empty( $invoice_id ) ? '' : "&invoice={$invoice_id}";
+		$ch = curl_init();
+		curl_setopt($ch, CURLOPT_URL, $api_url);
+		curl_setopt($ch, CURLOPT_POST, 1);
+		curl_setopt($ch, CURLOPT_POSTFIELDS, $data);  //Post Fields
+		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 
-		//Current Currency
-		$currency = rgar( $entry, 'currency' );
+		$headers = [
+			'X-API-key: '. $api_key,
+			'content-type: application/json',
+			'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+			'Accept-Encoding: gzip, deflate',
+			'Accept-Language: en-US,en;q=0.5',
+			'Cache-Control: no-cache',
+			'Content-Type: application/x-www-form-urlencoded; charset=utf-8',
+			'Host: www.example.com',
+			'Referer: http://www.example.com/index.php', //Your referrer address
+			'User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux i686; rv:28.0) Gecko/20100101 Firefox/28.0',
+			'X-MicrosoftAjax: Delta=true'
+		];
 
-		//Customer fields
-		$customer_fields = $this->customer_query_string( $feed, $entry );
+		curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 
-		//Image URL 
-		$image_url = ! empty( $feed['meta']['imageURL'] ) ? '&image_url=' . urlencode( $feed['meta']['imageURL'] ) : '';
+		$output = curl_exec ($ch); // Output
 
-		//Set return mode to 2 (PayPal will post info back to page). rm=1 seems to create lots of problems with the redirect back to the site. Defaulting it to 2.
-		$return_mode = '2';
+		curl_close ($ch);
 
-		$return_url = '&return=' . urlencode( $this->return_url( $form['id'], $entry['id'] ) ) . "&rm={$return_mode}";
-
-		//Cancel URL
-		$cancel_url = ! empty( $feed['meta']['cancelUrl'] ) ? '&cancel_return=' . urlencode( $feed['meta']['cancelUrl'] ) : '';
-
-		//Don't display note section
-		$disable_note = ! empty( $feed['meta']['disableNote'] ) ? '&no_note=1' : '';
-
-		//Don't display shipping section
-		$disable_shipping = ! empty( $feed['meta']['disableShipping'] ) ? '&no_shipping=1' : '';
-
-		//URL that will listen to notifications from PayPal
-		$ipn_url = urlencode( $this->get_callback_url() );
-
-		$business_email = urlencode( '1' ); // spacer
-		$custom_field   = $entry['id'] . '|' . wp_hash( $entry['id'] );
-
-		$url .= "?notify_url={$ipn_url}&charset=UTF-8&currency_code={$currency}&business={$business_email}&custom={$custom_field}{$invoice}{$customer_fields}{$image_url}{$cancel_url}{$disable_note}{$disable_shipping}{$return_url}";
-		$query_string = '';
-
-		switch ( $feed['meta']['transactionType'] ) {
-			case 'product' :
-				//build query string using $submission_data
-				$query_string = $this->get_product_query_string( $submission_data, $entry['id'] );
-				break;
-
-			case 'donation' :
-				$query_string = $this->get_donation_query_string( $submission_data, $entry['id'] );
-				break;
-
-			case 'subscription' :
-				$query_string = $this->get_subscription_query_string( $feed, $submission_data, $entry['id'] );
-				break;
-		}
-
-		$query_string = gf_apply_filters( 'gform_twint_query', $form['id'], $query_string, $form, $entry, $feed, $submission_data );
-
-		if ( ! $query_string ) {
-			$this->log_debug( __METHOD__ . '(): NOT sending to TWINT: The price is either zero or the gform_twint_query filter was used to remove the querystring that is sent to TWINT.' );
-
-			return '';
-		}
-
-		$url .= $query_string;
-
-		$url = gf_apply_filters( 'gform_twint_request', $form['id'], $url, $form, $entry, $feed, $submission_data );
-		
-		
-
-		$this->log_debug( __METHOD__ . "(): Sending to TWINT: {$url}" );
-
-		return $url;
+		//return $url;
 	}
 
 	public function return_url( $form_id, $lead_id ) {
