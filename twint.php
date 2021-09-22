@@ -1,40 +1,24 @@
 <?php
 /*
-Plugin Name: Gravity Forms PayPal Standard Add-On
+Plugin Name: Gravity Forms TWINT Add-On
 Plugin URI: https://gravityforms.com
-Description: Integrates Gravity Forms with PayPal Payments Standard, enabling end users to purchase goods and services through Gravity Forms.
-Version: 3.4
-Author: Gravity Forms
-Author URI: https://gravityforms.com
+Description: Integrates Gravity Forms with TWINT, enabling end users to purchase goods and services through Gravity Forms.
+Version: 1.0
 License: GPL-2.0+
-Text Domain: gravityformspaypal
+Text Domain: gravityformstwint
 Domain Path: /languages
 
 ------------------------------------------------------------------------
-Copyright 2009-2020 Rocketgenius, Inc.
 
-This program is free software; you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation; either version 2 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program; if not, write to the Free Software
-Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 */
 
 defined( 'ABSPATH' ) || die();
 
-define( 'GF_PAYPAL_VERSION', '3.4' );
+define( 'GF_TWINT_VERSION', '1.0' );
 
-add_action( 'gform_loaded', array( 'GF_PayPal_Bootstrap', 'load' ), 5 );
+add_action( 'gform_loaded', array( 'GF_TWINT_Bootstrap', 'load' ), 5 );
 
-class GF_PayPal_Bootstrap {
+class GF_TWINT_Bootstrap {
 
 	public static function load() {
 
@@ -42,12 +26,12 @@ class GF_PayPal_Bootstrap {
 			return;
 		}
 
-		require_once( 'class-gf-paypal.php' );
+		require_once( 'class-gf-twint.php' );
 
-		GFAddOn::register( 'GFPayPal' );
+		GFAddOn::register( 'GFTWINT' );
 	}
 }
 
-function gf_paypal() {
-	return GFPayPal::get_instance();
+function gf_twint() {
+	return GFTWINT::get_instance();
 }

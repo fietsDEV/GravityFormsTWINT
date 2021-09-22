@@ -2,31 +2,31 @@
 
 defined( 'ABSPATH' ) || die();
 
-add_action( 'wp', array( 'GFPayPal', 'maybe_thankyou_page' ), 5 );
+add_action( 'wp', array( 'GFTWINT', 'maybe_thankyou_page' ), 5 );
 
 GFForms::include_payment_addon_framework();
 
-class GFPayPal extends GFPaymentAddOn {
+class GFTWINT extends GFPaymentAddOn {
 
-	protected $_version = GF_PAYPAL_VERSION;
+	protected $_version = GF_TWINT_VERSION;
 	protected $_min_gravityforms_version = '1.9.3';
-	protected $_slug = 'gravityformspaypal';
-	protected $_path = 'gravityformspaypal/paypal.php';
+	protected $_slug = 'gravityformstwint';
+	protected $_path = 'gravityformstwint/twint.php';
 	protected $_full_path = __FILE__;
-	protected $_url = 'http://www.gravityforms.com';
-	protected $_title = 'Gravity Forms PayPal Standard Add-On';
-	protected $_short_title = 'PayPal';
+	protected $_url = '#';
+	protected $_title = 'Gravity Forms TWINT Add-On';
+	protected $_short_title = 'TWINT';
 	protected $_supports_callbacks = true;
 	private $production_url = 'https://www.paypal.com/cgi-bin/webscr/';
 	private $sandbox_url = 'https://www.sandbox.paypal.com/cgi-bin/webscr/';
 
 	// Members plugin integration
-	protected $_capabilities = array( 'gravityforms_paypal', 'gravityforms_paypal_uninstall' );
+	protected $_capabilities = array( 'gravityforms_twint', 'gravityforms_twint_uninstall' );
 
 	// Permissions
-	protected $_capabilities_settings_page = 'gravityforms_paypal';
-	protected $_capabilities_form_settings = 'gravityforms_paypal';
-	protected $_capabilities_uninstall = 'gravityforms_paypal_uninstall';
+	protected $_capabilities_settings_page = 'gravityforms_twint';
+	protected $_capabilities_form_settings = 'gravityforms_twint';
+	protected $_capabilities_uninstall = 'gravityforms_twint_uninstall';
 
 	// Automatic upgrade enabled
 	protected $_enable_rg_autoupgrade = true;
@@ -35,7 +35,7 @@ class GFPayPal extends GFPaymentAddOn {
 
 	public static function get_instance() {
 		if ( self::$_instance == null ) {
-			self::$_instance = new GFPayPal();
+			self::$_instance = new GFTWINT();
 		}
 
 		return self::$_instance;
@@ -83,540 +83,21 @@ class GFPayPal extends GFPaymentAddOn {
 	 * @since 3.2
 	 *
 	 * @return string
-	 */
-	public function get_menu_icon() {
-
-		return file_get_contents( $this->get_base_path() . '/images/menu-icon.svg' );
-
-	}
-
-	/**
-	 * Register needed styles.
-	 *
-	 * @since  3.2
-	 *
-	 * @return array $styles
-	 */
-	public function styles() {
-		$min = defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG || isset( $_GET['gform_debug'] ) ? '' : '.min';
-
-		$styles = array(
-			array(
-				'handle'  => 'gform_paypal_form_settings_css',
-				'src'     => $this->get_base_url() . "/css/form_settings{$min}.css",
-				'version' => $this->_version,
-				'enqueue' => array(
-					array( 'admin_page' => array( 'form_settings' ) ),
-				),
-			),
-		);
-
-		return array_merge( parent::styles(), $styles );
-
-	}
-
-	public function plugin_settings_fields() {
-		$description = '
-			<p style="text-align: left;">' .
-			esc_html__( 'Gravity Forms requires IPN to be enabled on your PayPal account. Follow the following steps to confirm IPN is enabled.', 'gravityformspaypal' ) .
-			'</p>
-			<ul>
-				<li>' . sprintf( esc_html__( 'Navigate to your PayPal %sIPN Settings page.%s', 'gravityformspaypal' ), '<a href="https://www.paypal.com/us/cgi-bin/webscr?cmd=_profile-ipn-notify" target="_blank">', '</a>' ) . '</li>' .
-			'<li>' . esc_html__( 'If IPN is already enabled, you will see your current IPN settings along with a button to turn off IPN. If that is the case, just check the confirmation box below and you are ready to go!', 'gravityformspaypal' ) . '</li>' .
-			'<li>' . esc_html__( "If IPN is not enabled, click the 'Choose IPN Settings' button.", 'gravityformspaypal' ) . '</li>' .
-			'<li>' . sprintf( esc_html__( 'Click the box to enable IPN and enter the following Notification URL: %s', 'gravityformspaypal' ), '<strong>' . esc_url( $this->get_callback_url() ) . '</strong>' ) . '</li>' .
-			'</ul>
-				<br/>';
-
-		return array(
-			array(
-				'title'       => '',
-				'description' => $description,
-				'fields'      => array(
-					array(
-						'name'    => 'gf_paypal_configured',
-						'label'   => esc_html__( 'PayPal IPN Setting', 'gravityformspaypal' ),
-						'type'    => 'checkbox',
-						'choices' => array( array( 'label' => esc_html__( 'Confirm that you have configured your PayPal account to enable IPN', 'gravityformspaypal' ), 'name' => 'gf_paypal_configured' ) )
-					),
-				),
-			),
-		);
-	}
-
-	public function feed_list_no_item_message() {
-		$settings = $this->get_plugin_settings();
-		if ( ! rgar( $settings, 'gf_paypal_configured' ) ) {
-			return sprintf( esc_html__( 'To get started, please configure your %sPayPal Settings%s!', 'gravityformspaypal' ), '<a href="' . admin_url( 'admin.php?page=gf_settings&subview=' . $this->_slug ) . '">', '</a>' );
-		} else {
-			return parent::feed_list_no_item_message();
-		}
-	}
-
-	public function feed_settings_fields() {
-		$default_settings = parent::feed_settings_fields();
-
-		//--add PayPal Email Address field
-		$fields = array(
-			array(
-				'name'     => 'paypalEmail',
-				'label'    => esc_html__( 'PayPal Email Address ', 'gravityformspaypal' ),
-				'type'     => 'text',
-				'class'    => 'medium',
-				'required' => true,
-				'tooltip'  => '<h6>' . esc_html__( 'PayPal Email Address', 'gravityformspaypal' ) . '</h6>' . esc_html__( 'Enter the PayPal email address where payment should be received.', 'gravityformspaypal' )
-			),
-			array(
-				'name'          => 'mode',
-				'label'         => esc_html__( 'Mode', 'gravityformspaypal' ),
-				'type'          => 'radio',
-				'choices'       => array(
-					array( 'id' => 'gf_paypal_mode_production', 'label' => esc_html__( 'Production', 'gravityformspaypal' ), 'value' => 'production' ),
-					array( 'id' => 'gf_paypal_mode_test', 'label' => esc_html__( 'Test', 'gravityformspaypal' ), 'value' => 'test' ),
-
-				),
-
-				'horizontal'    => true,
-				'default_value' => 'production',
-				'tooltip'       => '<h6>' . esc_html__( 'Mode', 'gravityformspaypal' ) . '</h6>' . esc_html__( 'Select Production to receive live payments. Select Test for testing purposes when using the PayPal development sandbox.', 'gravityformspaypal' )
-			),
-		);
-
-		$default_settings = parent::add_field_after( 'feedName', $fields, $default_settings );
-		//--------------------------------------------------------------------------------------
-
-		//--add donation to transaction type drop down
-		$transaction_type = parent::get_field( 'transactionType', $default_settings );
-		$choices          = $transaction_type['choices'];
-		$add_donation     = true;
-		foreach ( $choices as $choice ) {
-			//add donation option if it does not already exist
-			if ( $choice['value'] == 'donation' ) {
-				$add_donation = false;
-			}
-		}
-		if ( $add_donation ) {
-			//add donation transaction type
-			$choices[] = array( 'label' => __( 'Donations', 'gravityformspaypal' ), 'value' => 'donation' );
-		}
-		$transaction_type['choices'] = $choices;
-		$default_settings            = $this->replace_field( 'transactionType', $transaction_type, $default_settings );
-		//-------------------------------------------------------------------------------------------------
-
-		//--add Image URL, Cancel URL
-		$fields = array(
-			array(
-				'name'     => 'imageURL',
-				'label'    => esc_html__( 'Image URL', 'gravityformspaypal' ),
-				'type'     => 'text',
-				'class'    => 'medium',
-				'required' => false,
-				'tooltip'  => '<h6>' . esc_html__( 'Image URL', 'gravityformspaypal' ) . '</h6>' . esc_html__( 'This option allows you to enter the URL of the 150x50-pixel image displayed as your logo in the upper left corner of the PayPal checkout pages. Default is your business name, if you have a PayPal Business account or your email address, if you have PayPal Premier or Personal account.', 'gravityformspaypal' )
-			),
-			array(
-				'name'     => 'cancelUrl',
-				'label'    => esc_html__( 'Cancel URL', 'gravityformspaypal' ),
-				'type'     => 'text',
-				'class'    => 'medium',
-				'required' => false,
-				'tooltip'  => '<h6>' . esc_html__( 'Cancel URL', 'gravityformspaypal' ) . '</h6>' . esc_html__( 'Enter the URL the user should be sent to should they cancel before completing their PayPal payment.', 'gravityformspaypal' )
-			),
-			array(
-				'name'    => 'options',
-				'label'   => esc_html__( 'Options', 'gravityformspaypal' ),
-				'type'    => 'options',
-				'tooltip' => '<h6>' . esc_html__( 'Options', 'gravityformspaypal' ) . '</h6>' . esc_html__( 'Turn on or off the available PayPal checkout options.', 'gravityformspaypal' ),
-				'choices' => array(
-					array(
-						'label' => esc_html__( 'Do not prompt buyer to include a shipping address.', 'gravityformspaypal' ),
-						'name'  => 'disableShipping',
-					),
-					array(
-						'label' => esc_html__( 'Do not prompt buyer to include a note with payment.', 'gravityformspaypal' ),
-						'name'  => 'disableNote',
-					),
-				),
-			),
-		);
-
-		if ( $this->get_setting( 'delayNotification' ) || ! $this->is_gravityforms_supported( '1.9.12' ) ) {
-			$fields[] = array(
-				'name'    => 'notifications',
-				'label'   => esc_html__( 'Notifications', 'gravityformspaypal' ),
-				'type'    => 'notifications',
-				'tooltip' => '<h6>' . esc_html__( 'Notifications', 'gravityformspaypal' ) . '</h6>' . esc_html__( "Enable this option if you would like to only send out this form's notifications for the 'Form is submitted' event after payment has been received. Leaving this option disabled will send these notifications immediately after the form is submitted. Notifications which are configured for other events will not be affected by this option.", 'gravityformspaypal' )
-			);
-		}
-
-		//Add post fields if form has a post
-		$form = $this->get_current_form();
-		if ( GFCommon::has_post_field( $form['fields'] ) ) {
-			$post_settings = array(
-				'name'    => 'post_checkboxes',
-				'label'   => esc_html__( 'Posts', 'gravityformspaypal' ),
-				'type'    => 'checkbox',
-				'tooltip' => '<h6>' . esc_html__( 'Posts', 'gravityformspaypal' ) . '</h6>' . esc_html__( 'Enable this option if you would like to only create the post after payment has been received.', 'gravityformspaypal' ),
-				'choices' => array(
-					array( 'label' => esc_html__( 'Create post only when payment is received.', 'gravityformspaypal' ), 'name' => 'delayPost' ),
-				),
-			);
-
-			if ( $this->get_setting( 'transactionType' ) == 'subscription' ) {
-				$post_settings['choices'][] = array(
-					'label'    => esc_html__( 'Change post status when subscription is canceled.', 'gravityformspaypal' ),
-					'name'     => 'change_post_status',
-					'onChange' => 'var action = this.checked ? "draft" : ""; jQuery("#update_post_action").val(action);',
-				);
-			}
-
-			$fields[] = $post_settings;
-		}
-
-		//Adding custom settings for backwards compatibility with hook 'gform_paypal_add_option_group'
-		$fields[] = array(
-			'name'  => 'custom_options',
-			'label' => '',
-			'type'  => 'custom',
-		);
-
-		$default_settings = $this->add_field_after( 'billingInformation', $fields, $default_settings );
-		//-----------------------------------------------------------------------------------------
-
-		//--get billing info section and add customer first/last name
-		$billing_info   = parent::get_field( 'billingInformation', $default_settings );
-		$billing_fields = $billing_info['field_map'];
-		$add_first_name = true;
-		$add_last_name  = true;
-		foreach ( $billing_fields as $mapping ) {
-			//add first/last name if it does not already exist in billing fields
-			if ( $mapping['name'] == 'firstName' ) {
-				$add_first_name = false;
-			} else if ( $mapping['name'] == 'lastName' ) {
-				$add_last_name = false;
-			}
-		}
-
-		if ( $add_last_name ) {
-			//add last name
-			array_unshift( $billing_info['field_map'], array( 'name' => 'lastName', 'label' => esc_html__( 'Last Name', 'gravityformspaypal' ), 'required' => false ) );
-		}
-		if ( $add_first_name ) {
-			array_unshift( $billing_info['field_map'], array( 'name' => 'firstName', 'label' => esc_html__( 'First Name', 'gravityformspaypal' ), 'required' => false ) );
-		}
-		$default_settings = parent::replace_field( 'billingInformation', $billing_info, $default_settings );
-		//----------------------------------------------------------------------------------------------------
-
-		//hide default display of setup fee, not used by PayPal Standard
-		$default_settings = parent::remove_field( 'setupFee', $default_settings );
-
-		//--add trial period
-		$trial_period     = array(
-			'name'    => 'trialPeriod',
-			'label'   => esc_html__( 'Trial Period', 'gravityformspaypal' ),
-			'type'    => 'trial_period',
-			'hidden'  => ! $this->get_setting( 'trial_enabled' ),
-			'tooltip' => '<h6>' . esc_html__( 'Trial Period', 'gravityformspaypal' ) . '</h6>' . esc_html__( 'Select the trial period length.', 'gravityformspaypal' )
-		);
-		$default_settings = parent::add_field_after( 'trial', $trial_period, $default_settings );
-		//-----------------------------------------------------------------------------------------
-
-		//--Add Try to bill again after failed attempt.
-		$recurring_retry  = array(
-			'name'       => 'recurringRetry',
-			'label'      => esc_html__( 'Recurring Retry', 'gravityformspaypal' ),
-			'type'       => 'checkbox',
-			'horizontal' => true,
-			'choices'    => array( array( 'label' => esc_html__( 'Try to bill again after failed attempt.', 'gravityformspaypal' ), 'name' => 'recurringRetry', 'value' => '1' ) ),
-			'tooltip'    => '<h6>' . esc_html__( 'Recurring Retry', 'gravityformspaypal' ) . '</h6>' . esc_html__( 'Turn on or off whether to try to bill again after failed attempt.', 'gravityformspaypal' )
-		);
-		$default_settings = parent::add_field_after( 'recurringTimes', $recurring_retry, $default_settings );
-
-		//-----------------------------------------------------------------------------------------------------
-
-		/**
-		 * Filter through the feed settings fields for the Paypal feed
-		 *
-		 * @param array $default_settings The Default feed settings
-		 * @param array $form The Form object to filter through
-		 */
-		return apply_filters( 'gform_paypal_feed_settings_fields', $default_settings, $form );
-	}
-
-	public function supported_billing_intervals() {
-
-		$billing_cycles = array(
-			'day'   => array( 'label' => esc_html__( 'day(s)', 'gravityformspaypal' ), 'min' => 1, 'max' => 90 ),
-			'week'  => array( 'label' => esc_html__( 'week(s)', 'gravityformspaypal' ), 'min' => 1, 'max' => 52 ),
-			'month' => array( 'label' => esc_html__( 'month(s)', 'gravityformspaypal' ), 'min' => 1, 'max' => 24 ),
-			'year'  => array( 'label' => esc_html__( 'year(s)', 'gravityformspaypal' ), 'min' => 1, 'max' => 5 )
-		);
-
-		return $billing_cycles;
-	}
-
-	public function field_map_title() {
-		return esc_html__( 'PayPal Field', 'gravityformspaypal' );
-	}
-
-	public function settings_trial_period( $field, $echo = true ) {
-		//use the parent billing cycle function to make the drop down for the number and type
-		$html = parent::settings_billing_cycle( $field, false );
-
-		if ( $echo ) {
-			echo $html;
-		}
-
-		return $html;
-	}
-
-	public function set_trial_onchange( $field ) {
-		//return the javascript for the onchange event
-		$row_id = $this->is_gravityforms_supported( '2.5-dev-1' ) ? '#gform_setting_trialPeriod' : '#gaddon-setting-row-trialPeriod';
-		return "
-		if(jQuery(this).prop('checked')){
-			jQuery('#{$field['name']}_product').show('slow');
-			jQuery('{$row_id}').show('slow');
-			if (jQuery('#{$field['name']}_product').val() == 'enter_amount'){
-				jQuery('#{$field['name']}_amount').show('slow');
-			}
-			else{
-				jQuery('#{$field['name']}_amount').hide();
-			}
-		}
-		else {
-			jQuery('#{$field['name']}_product').hide('slow');
-			jQuery('#{$field['name']}_amount').hide();
-			jQuery('{$row_id}').hide('slow');
-		}";
-	}
-
-	public function settings_options( $field, $echo = true ) {
-		$html = $this->settings_checkbox( $field, false );
-
-		//--------------------------------------------------------
-		//For backwards compatibility.
-		ob_start();
-		do_action( 'gform_paypal_action_fields', $this->get_current_feed(), $this->get_current_form() );
-		$html .= ob_get_clean();
-		//--------------------------------------------------------
-
-		if ( $echo ) {
-			echo $html;
-		}
-
-		return $html;
-	}
-
-	public function settings_custom( $field, $echo = true ) {
-
-		ob_start();
-		?>
-		<div id='gf_paypal_custom_settings'>
-			<?php
-			do_action( 'gform_paypal_add_option_group', $this->get_current_feed(), $this->get_current_form() );
-			?>
-		</div>
-
-		<?php
-
-		$html = ob_get_clean();
-
-		if ( $echo ) {
-			echo $html;
-		}
-
-		return $html;
-	}
-
-	public function settings_notifications( $field, $echo = true ) {
-		$checkboxes = array(
-			'name'    => 'delay_notification',
-			'type'    => 'checkboxes',
-			'onclick' => 'ToggleNotifications();',
-			'choices' => array(
-				array(
-					'label' => esc_html__( "Send notifications for the 'Form is submitted' event only when payment is received.", 'gravityformspaypal' ),
-					'name'  => 'delayNotification',
-				),
-			)
-		);
-
-		$html = $this->settings_checkbox( $checkboxes, false );
-
-		$html .= $this->settings_hidden( array( 'name' => 'selectedNotifications', 'id' => 'selectedNotifications' ), false );
-
-		$form                      = $this->get_current_form();
-		$has_delayed_notifications = $this->get_setting( 'delayNotification' );
-		ob_start();
-		?>
-		<ul id="gf_paypal_notification_container" style="padding-left:20px; margin-top:10px; <?php echo $has_delayed_notifications ? '' : 'display:none;' ?>">
-			<?php
-			if ( ! empty( $form ) && is_array( $form['notifications'] ) ) {
-				$selected_notifications = $this->get_setting( 'selectedNotifications' );
-				if ( ! is_array( $selected_notifications ) ) {
-					$selected_notifications = array();
-				}
-
-				//$selected_notifications = empty($selected_notifications) ? array() : json_decode($selected_notifications);
-
-				$notifications = GFCommon::get_notifications( 'form_submission', $form );
-
-				foreach ( $notifications as $notification ) {
-					?>
-					<li class="gf_paypal_notification">
-						<input type="checkbox" class="notification_checkbox" value="<?php echo $notification['id'] ?>" onclick="SaveNotifications();" <?php checked( true, in_array( $notification['id'], $selected_notifications ) ) ?> />
-						<label class="inline" for="gf_paypal_selected_notifications"><?php echo $notification['name']; ?></label>
-					</li>
-				<?php
-				}
-			}
-			?>
-		</ul>
-		<script type='text/javascript'>
-			function SaveNotifications() {
-				var notifications = [];
-				jQuery('.notification_checkbox').each(function () {
-					if (jQuery(this).is(':checked')) {
-						notifications.push(jQuery(this).val());
-					}
-				});
-				jQuery('#selectedNotifications').val(jQuery.toJSON(notifications));
-			}
-
-			function ToggleNotifications() {
-
-				var container = jQuery('#gf_paypal_notification_container');
-				var isChecked = jQuery('#delaynotification').is(':checked');
-
-				if (isChecked) {
-					container.slideDown();
-					jQuery('.gf_paypal_notification input').prop('checked', true);
-				}
-				else {
-					container.slideUp();
-					jQuery('.gf_paypal_notification input').prop('checked', false);
-				}
-
-				SaveNotifications();
-			}
-		</script>
-		<?php
-
-		$html .= ob_get_clean();
-
-		if ( $echo ) {
-			echo $html;
-		}
-
-		return $html;
-	}
-
-	public function checkbox_input_change_post_status( $choice, $attributes, $value, $tooltip ) {
-		$markup = $this->checkbox_input( $choice, $attributes, $value, $tooltip );
-
-		$dropdown_field = array(
-			'name'     => 'update_post_action',
-			'choices'  => array(
-				array( 'label' => '' ),
-				array( 'label' => esc_html__( 'Mark Post as Draft', 'gravityformspaypal' ), 'value' => 'draft' ),
-				array( 'label' => esc_html__( 'Delete Post', 'gravityformspaypal' ), 'value' => 'delete' ),
-
-			),
-			'onChange' => "var checked = jQuery(this).val() ? 'checked' : false; jQuery('#change_post_status').attr('checked', checked);",
-		);
-		$markup .= '&nbsp;&nbsp;' . $this->settings_select( $dropdown_field, false );
-
-		return $markup;
-	}
-
-	/**
-	 * Prevent the GFPaymentAddOn version of the options field being added to the feed settings.
 	 * 
-	 * @return bool
+	 * empty
 	 */
-	public function option_choices() {
-		
-		return false;
-	}
+	
+	 // ----------------------------- //
 
-	public function save_feed_settings( $feed_id, $form_id, $settings ) {
 
-		//--------------------------------------------------------
-		//For backwards compatibility
-		$feed = $this->get_feed( $feed_id );
 
-		//Saving new fields into old field names to maintain backwards compatibility for delayed payments
-		$settings['type'] = $settings['transactionType'];
 
-		if ( isset( $settings['recurringAmount'] ) ) {
-			$settings['recurring_amount_field'] = $settings['recurringAmount'];
-		}
-
-		$feed['meta'] = $settings;
-		$feed         = apply_filters( 'gform_paypal_save_config', $feed );
-		
-		//call hook to validate custom settings/meta added using gform_paypal_action_fields or gform_paypal_add_option_group action hooks
-		$is_validation_error = apply_filters( 'gform_paypal_config_validation', false, $feed );
-		if ( $is_validation_error ) {
-			//fail save
-			return false;
-		}
-
-		$settings = $feed['meta'];
-		
-		//--------------------------------------------------------
-
-		return parent::save_feed_settings( $feed_id, $form_id, $settings );
-	}
-
-	public function check_ipn_request() {
-
-		$dismiss = isset( $_GET['dismiss_ipn_check'] );
-		if ( $dismiss ) {
-			add_option( 'dismiss_ipn_check', 1 );
-		}
-
-		if ( get_option( 'dismiss_ipn_check' ) ) {
-			return;
-		}
-
-		$can_verify_ipn = get_option( 'can_verify_ipn' );
-		if ( $can_verify_ipn == 'yes' ) {
-			return;
-		}
-
-		if ( empty( $can_verify_ipn ) ) {
-
-			$url = 'https://www.sandbox.paypal.com/cgi-bin/webscr/';
-			$request  = new WP_Http();
-			$response = $request->post( $url, array( 'httpversion' => '1.1', 'sslverify' => false, 'ssl' => true, 'body' => 'cmd=_notify-validate', 'timeout' => 20 ) );
-
-			if ( ! is_wp_error( $response ) && rgar( $response, 'body' ) == 'INVALID' ) {
-
-				$can_verify_ipn = 'yes';
-			} else {
-
-				wp_mail( get_bloginfo( 'admin_email' ), 'Immediate Action Required: SSL certificate is outdated', 'WARNING: Your web server does not currently support the SHA-2 SSL Certificate standard required by PayPal.  <a href="https://devblog.paypal.com/paypal-ssl-certificate-changes/">For details see PayPal\'s changeover announcement</a>. Please contact your web host to resolve this issue as soon as possible.' );
-				$can_verify_ipn = 'no';
-			}
-
-			update_option( 'can_verify_ipn', $can_verify_ipn );
-		}
-
-		if ( $can_verify_ipn == 'no' ) {
-
-			//display message
-			echo '<div class="error"> <p><strong>WARNING:</strong> Your web server does not currently support the SHA-2 SSL Certificate standard required by PayPal.  <a href="https://devblog.paypal.com/paypal-ssl-certificate-changes/">For details see PayPal\'s changeover announcement</a>. Please contact your web host to resolve this issue as soon as possible. <a href="' . add_query_arg( array( 'dismiss_ipn_check' => 1 ) ) . '">Dismiss</a></p></div>';
-
-		}
-	}
-
-	//------ SENDING TO PAYPAL -----------//
+	//------ SENDING TO TWINT -----------//
 
 	public function redirect_url( $feed, $submission_data, $form, $entry ) {
 
-		//Don't process redirect url if request is a PayPal return
-		if ( ! rgempty( 'gf_paypal_return', $_GET ) ) {
+		//Don't process redirect url if request is a TWINT return
+		if ( ! rgempty( 'gf_twint_return', $_GET ) ) {
 			return false;
 		}
 
@@ -626,7 +107,7 @@ class GFPayPal extends GFPaymentAddOn {
 		//Getting Url (Production or Sandbox)
 		$url = $feed['meta']['mode'] == 'production' ? $this->production_url : $this->sandbox_url;
 
-		$invoice_id = apply_filters( 'gform_paypal_invoice', '', $form, $entry );
+		$invoice_id = apply_filters( 'gform_twint_invoice', '', $form, $entry );
 
 		$invoice = empty( $invoice_id ) ? '' : "&invoice={$invoice_id}";
 
@@ -656,7 +137,7 @@ class GFPayPal extends GFPaymentAddOn {
 		//URL that will listen to notifications from PayPal
 		$ipn_url = urlencode( $this->get_callback_url() );
 
-		$business_email = urlencode( trim( $feed['meta']['paypalEmail'] ) );
+		$business_email = urlencode( '1' ); // spacer
 		$custom_field   = $entry['id'] . '|' . wp_hash( $entry['id'] );
 
 		$url .= "?notify_url={$ipn_url}&charset=UTF-8&currency_code={$currency}&business={$business_email}&custom={$custom_field}{$invoice}{$customer_fields}{$image_url}{$cancel_url}{$disable_note}{$disable_shipping}{$return_url}";
@@ -677,22 +158,21 @@ class GFPayPal extends GFPaymentAddOn {
 				break;
 		}
 
-		$query_string = gf_apply_filters( 'gform_paypal_query', $form['id'], $query_string, $form, $entry, $feed, $submission_data );
+		$query_string = gf_apply_filters( 'gform_twint_query', $form['id'], $query_string, $form, $entry, $feed, $submission_data );
 
 		if ( ! $query_string ) {
-			$this->log_debug( __METHOD__ . '(): NOT sending to PayPal: The price is either zero or the gform_paypal_query filter was used to remove the querystring that is sent to PayPal.' );
+			$this->log_debug( __METHOD__ . '(): NOT sending to TWINT: The price is either zero or the gform_twint_query filter was used to remove the querystring that is sent to TWINT.' );
 
 			return '';
 		}
 
 		$url .= $query_string;
 
-		$url = gf_apply_filters( 'gform_paypal_request', $form['id'], $url, $form, $entry, $feed, $submission_data );
+		$url = gf_apply_filters( 'gform_twint_request', $form['id'], $url, $form, $entry, $feed, $submission_data );
 		
-		//add the bn code (build notation code)
-		$url .= '&bn=Rocketgenius_SP';
+		
 
-		$this->log_debug( __METHOD__ . "(): Sending to PayPal: {$url}" );
+		$this->log_debug( __METHOD__ . "(): Sending to TWINT: {$url}" );
 
 		return $url;
 	}
@@ -906,14 +386,7 @@ class GFPayPal extends GFPaymentAddOn {
 
 		}
 
-		$trial = '';
-		//see if a trial exists
-		if ( $trial_enabled ) {
-			$trial_amount        = rgar( $submission_data, 'trial' ) ? rgar( $submission_data, 'trial' ) : 0;
-			$trial_period_number = rgar( $feed['meta'], 'trialPeriod_length' );
-			$trial_period_type   = $this->convert_interval( rgar( $feed['meta'], 'trialPeriod_unit' ), 'char' );
-			$trial               = "&a1={$trial_amount}&p1={$trial_period_number}&t1={$trial_period_type}";
-		}
+		
 
 		//check for recurring times
 		$recurring_times = rgar( $feed['meta'], 'recurringTimes' ) ? '&srt=' . rgar( $feed['meta'], 'recurringTimes' ) : '';
@@ -954,7 +427,7 @@ class GFPayPal extends GFPaymentAddOn {
 	public function return_url( $form_id, $lead_id ) {
 		$pageURL = GFCommon::is_ssl() ? 'https://' : 'http://';
 
-		$server_port = apply_filters( 'gform_paypal_return_url_port', $_SERVER['SERVER_PORT'] );
+		$server_port = apply_filters( 'gform_twint_return_url_port', $_SERVER['SERVER_PORT'] );
 
 		if ( $server_port != '80' ) {
 			$pageURL .= $_SERVER['SERVER_NAME'] . ':' . $server_port . $_SERVER['REQUEST_URI'];
@@ -965,11 +438,11 @@ class GFPayPal extends GFPaymentAddOn {
 		$ids_query = "ids={$form_id}|{$lead_id}";
 		$ids_query .= '&hash=' . wp_hash( $ids_query );
 
-		$url = add_query_arg( 'gf_paypal_return', base64_encode( $ids_query ), $pageURL );
+		$url = add_query_arg( 'gf_twint_return', base64_encode( $ids_query ), $pageURL );
 
-		$query = 'gf_paypal_return=' . base64_encode( $ids_query );
+		$query = 'gf_twint_return=' . base64_encode( $ids_query );
 		/**
-		 * Filters PayPal's return URL, which is the URL that users will be sent to after completing the payment on PayPal's site.
+		 * Filters TWINT's return URL, which is the URL that users will be sent to after completing the payment on TWINT's site.
 		 * Useful when URL isn't created correctly (could happen on some server configurations using PROXY servers).
 		 *
 		 * @since 2.4.5
@@ -979,7 +452,7 @@ class GFPayPal extends GFPaymentAddOn {
 		 * @param int $entry_id	The ID of the entry that was just created.
 		 * @param string $query	The query string portion of the URL.
 		 */
-		return apply_filters( 'gform_paypal_return_url', $url, $form_id, $lead_id, $query  );
+		return apply_filters( 'gform_twint_return_url', $url, $form_id, $lead_id, $query  );
 
 	}
 
@@ -990,7 +463,7 @@ class GFPayPal extends GFPaymentAddOn {
 			return;
 		}
 
-		if ( $str = rgget( 'gf_paypal_return' ) ) {
+		if ( $str = rgget( 'gf_twint_return' ) ) {
 			$str = base64_decode( $str );
 
 			parse_str( $str, $query );
@@ -1103,7 +576,7 @@ class GFPayPal extends GFPaymentAddOn {
 	}
 
 
-	//------- PROCESSING PAYPAL IPN (Callback) -----------//
+	//------- PROCESSING TWINT (Callback) -----------//
 
 	public function callback() {
 
@@ -1111,30 +584,30 @@ class GFPayPal extends GFPaymentAddOn {
 			return false;
 		}
 
-		$this->log_debug( __METHOD__ . '(): IPN request received. Starting to process => ' . print_r( $_POST, true ) );
+		$this->log_debug( __METHOD__ . '(): TWINT request received. Starting to process => ' . print_r( $_POST, true ) );
 
-		// Valid IPN requests must have a custom field
+		// Valid TWINT requests must have a custom field
 		$custom_field = rgpost( 'custom' );
 		if ( empty( $custom_field ) ) {
-			$this->log_error( __METHOD__ . '(): IPN request does not have a custom field, so it was not created by Gravity Forms. Aborting.' );
+			$this->log_error( __METHOD__ . '(): TWINT request does not have a custom field, so it was not created by Gravity Forms. Aborting.' );
 
 			return false;
 		}
 
 
 		//------- Send request to paypal and verify it has not been spoofed ---------------------//
-		$is_verified = $this->verify_paypal_ipn();
+		$is_verified = $this->verify_twint();
 		if ( is_wp_error( $is_verified ) ) {
-			$this->log_error( __METHOD__ . '(): IPN verification failed with an error. Aborting with a 500 error so that IPN is resent.' );
+			$this->log_error( __METHOD__ . '(): TWINT verification failed with an error. Aborting with a 500 error so that IPN is resent.' );
 
-			return new WP_Error( 'IPNVerificationError', 'There was an error when verifying the IPN message with PayPal', array( 'status_header' => 500 ) );
+			return new WP_Error( 'IPNVerificationError', 'There was an error when verifying the IPN message with TWINT', array( 'status_header' => 500 ) );
 		} elseif ( ! $is_verified ) {
-			$this->log_error( __METHOD__ . '(): IPN request could not be verified by PayPal. Aborting.' );
+			$this->log_error( __METHOD__ . '(): IPN request could not be verified by TWINT. Aborting.' );
 
 			return false;
 		}
 
-		$this->log_debug( __METHOD__ . '(): IPN message successfully verified by PayPal' );
+		$this->log_debug( __METHOD__ . '(): IPN message successfully verified by TWINT' );
 
 
 		//------ Getting entry related to this IPN ----------------------------------------------//
@@ -1160,7 +633,7 @@ class GFPayPal extends GFPaymentAddOn {
 
 		//Ignore IPN messages from forms that are no longer configured with the PayPal add-on
 		if ( ! $feed || ! rgar( $feed, 'is_active' ) ) {
-			$this->log_error( __METHOD__ . "(): Form no longer is configured with PayPal Addon. Form ID: {$entry['form_id']}. Aborting." );
+			$this->log_error( __METHOD__ . "(): Form no longer is configured with TWINT Addon. Form ID: {$entry['form_id']}. Aborting." );
 
 			return false;
 		}
@@ -1169,16 +642,16 @@ class GFPayPal extends GFPaymentAddOn {
 
 		//----- Making sure this IPN can be processed -------------------------------------//
 		if ( ! $this->can_process_ipn( $feed, $entry ) ) {
-			$this->log_debug( __METHOD__ . '(): IPN cannot be processed.' );
+			$this->log_debug( __METHOD__ . '(): TWINT cannot be processed.' );
 
 			return false;
 		}
 
 
 		//----- Processing IPN ------------------------------------------------------------//
-		$this->log_debug( __METHOD__ . '(): Processing IPN...' );
+		$this->log_debug( __METHOD__ . '(): Processing TWINT...' );
 		$action = $this->process_ipn( $feed, $entry, rgpost( 'payment_status' ), rgpost( 'txn_type' ), rgpost( 'txn_id' ), rgpost( 'parent_txn_id' ), rgpost( 'subscr_id' ), rgpost( 'mc_gross' ), rgpost( 'pending_reason' ), rgpost( 'reason_code' ), rgpost( 'mc_amount3' ) );
-		$this->log_debug( __METHOD__ . '(): IPN processing complete.' );
+		$this->log_debug( __METHOD__ . '(): TWINT processing complete.' );
 
 		if ( rgempty( 'entry_id', $action ) ) {
 			return false;
@@ -1194,17 +667,17 @@ class GFPayPal extends GFPaymentAddOn {
 
 		if ( empty( $feed ) && ! empty( $entry['id'] ) ) {
 			//looking for feed created by legacy versions
-			$feed = $this->get_paypal_feed_by_entry( $entry['id'] );
+			$feed = $this->get_twint_feed_by_entry( $entry['id'] );
 		}
 
-		$feed = apply_filters( 'gform_paypal_get_payment_feed', $feed, $entry, $form ? $form : GFAPI::get_form( $entry['form_id'] ) );
+		$feed = apply_filters( 'gform_twint_get_payment_feed', $feed, $entry, $form ? $form : GFAPI::get_form( $entry['form_id'] ) );
 
 		return $feed;
 	}
 
-	private function get_paypal_feed_by_entry( $entry_id ) {
+	private function get_twint_feed_by_entry( $entry_id ) {
 
-		$feed_id = gform_get_meta( $entry_id, 'paypal_feed_id' );
+		$feed_id = gform_get_meta( $entry_id, 'twint_feed_id' );
 		$feed    = $this->get_feed( $feed_id );
 
 		return ! empty( $feed ) ? $feed : false;
@@ -1243,18 +716,18 @@ class GFPayPal extends GFPaymentAddOn {
 			$this->log_debug( __METHOD__ . '(): Executing functions hooked to gform_post_payment_status.' );
 		}
 
-		do_action( 'gform_paypal_ipn_' . $txn_type, $entry, $feed, $status, $txn_type, $transaction_id, $parent_txn_id, $subscriber_id, $amount, $pending_reason, $reason );
-		if ( has_filter( 'gform_paypal_ipn_' . $txn_type ) ) {
-			$this->log_debug( __METHOD__ . "(): Executing functions hooked to gform_paypal_ipn_{$txn_type}." );
+		do_action( 'gform_twint_ipn_' . $txn_type, $entry, $feed, $status, $txn_type, $transaction_id, $parent_txn_id, $subscriber_id, $amount, $pending_reason, $reason );
+		if ( has_filter( 'gform_twint_ipn_' . $txn_type ) ) {
+			$this->log_debug( __METHOD__ . "(): Executing functions hooked to gform_twint_ipn_{$txn_type}." );
 		}
 
-		do_action( 'gform_paypal_post_ipn', $_POST, $entry, $feed, false );
-		if ( has_filter( 'gform_paypal_post_ipn' ) ) {
-			$this->log_debug( __METHOD__ . '(): Executing functions hooked to gform_paypal_post_ipn.' );
+		do_action( 'gform_twint_post_ipn', $_POST, $entry, $feed, false );
+		if ( has_filter( 'gform_twint_post_ipn' ) ) {
+			$this->log_debug( __METHOD__ . '(): Executing functions hooked to gform_twint_post_ipn.' );
 		}
 	}
 
-	private function verify_paypal_ipn() {
+	private function verify_twint() {
 
 		$req = 'cmd=_notify-validate';
 		foreach ( $_POST as $key => $value ) {
@@ -1262,16 +735,16 @@ class GFPayPal extends GFPaymentAddOn {
 			$req .= "&$key=$value";
 		}
 
-		$url = rgpost( 'test_ipn' ) ? $this->sandbox_url : apply_filters( 'gform_paypal_ipn_url', $this->production_url );
+		$url = rgpost( 'test_ipn' ) ? $this->sandbox_url : apply_filters( 'gform_twint_ipn_url', $this->production_url );
 
-		$this->log_debug( __METHOD__ . "(): Sending IPN request to PayPal for validation. URL: $url - Data: $req" );
+		$this->log_debug( __METHOD__ . "(): Sending IPN request to twint for validation. URL: $url - Data: $req" );
 
 		$url_info = parse_url( $url );
 
 		//Post back to PayPal system to validate
 		$request  = new WP_Http();
 		$headers  = array( 'Host' => $url_info['host'] );
-		$sslverify = (bool) get_option( 'gform_paypal_sslverify' );
+		$sslverify = (bool) get_option( 'gform_twint_sslverify' );
 
 		/**
 		 * Allow sslverify be modified before sending requests
@@ -1280,7 +753,7 @@ class GFPayPal extends GFPaymentAddOn {
 		 *
 		 * @param bool $sslverify Whether to verify SSL for the request. Default true for new installations, false for legacy installations.
 		 */
-		$sslverify = apply_filters( 'gform_paypal_sslverify', $sslverify );
+		$sslverify = apply_filters( 'gform_twint_sslverify', $sslverify );
 		$this->log_debug( __METHOD__ . '(): sslverify: ' . $sslverify );
 		$response = $request->post( $url, array( 'httpversion' => '1.1', 'headers' => $headers, 'sslverify' => $sslverify, 'ssl' => true, 'body' => $req, 'timeout' => 20 ) );
 		$this->log_debug( __METHOD__ . '(): Response: ' . print_r( $response, true ) );
@@ -1312,7 +785,7 @@ class GFPayPal extends GFPaymentAddOn {
 				$action['subscription_id']  = $subscriber_id;
 				$action['amount']           = $amount;
 				$action['entry_id']         = $entry['id'];
-				$action['payment_method']	= 'PayPal';
+				$action['payment_method']	= 'TWINT';
 				return $action;
 				break;
 
