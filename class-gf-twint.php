@@ -113,6 +113,42 @@ class GFTWINT extends GFPaymentAddOn {
 		}
 		*/
 
+		// Write Order-Details to GF
+		add_action( 'gform_after_submission_1', 'post_to_gf', 10, 2 );
+		function post_to_gf( $entry, $form ) {
+		
+			$endpoint_url = 'https://thirdparty.com';
+			$body = array(
+				'first_name' => rgar( $entry, '1.3' ),
+				'last_name' => rgar( $entry, '1.6' ),
+				'message' => rgar( $entry, '3' ),
+				);
+			GFCommon::log_debug( 'gform_after_submission: body => ' . print_r( $body, true ) );
+		
+			$response = wp_remote_post( $endpoint_url, array( 'body' => $body ) );
+			GFCommon::log_debug( 'gform_after_submission: response => ' . print_r( $response, true ) );
+
+		};
+		// Write Order-Details to iMatrix
+		add_action( 'gform_after_submission_2', 'post_to_imatrix', 10, 2 );
+		function post_to_imatrix( $entry, $form ) {
+		
+			$endpoint_url = 'https://thirdparty.com';
+			$body = array(
+				'first_name' => rgar( $entry, '1.3' ),
+				'last_name' => rgar( $entry, '1.6' ),
+				'message' => rgar( $entry, '3' ),
+				'status' => rgar( $entry, 'status' ), // status "offen"
+				);
+			GFCommon::log_debug( 'gform_after_submission: body => ' . print_r( $body, true ) );
+		
+			$response = wp_remote_post( $endpoint_url, array( 'body' => $body ) );
+			GFCommon::log_debug( 'gform_after_submission: response => ' . print_r( $response, true ) );
+		}
+
+
+
+
 		$data_string = json_decode($output, true);
 		$payment_url = $data_string['url'];
 
