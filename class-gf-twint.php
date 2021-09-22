@@ -47,6 +47,9 @@ class GFTWINT extends GFPaymentAddOn {
 		$payment_value = number_format($payment_value_raw, 2, '.');
 		$buyer_ref = 'UNIQUE_SHOPPER_ID_6728';
 
+		$buyer_name = 'Test User';
+		$buyer_email = 's.hopper@example.com';
+
 		$data = '{
 			"reference": "'.$payment_ref.'",
 			"amount": {
@@ -57,7 +60,20 @@ class GFTWINT extends GFPaymentAddOn {
 			"description": "Spende",
 			"countryCode": "CH",
 			"merchantAccount": "'.$merch_account.'",
-			"shopperLocale": "ch-CH"
+			"shopperLocale": "ch-CH",
+			"shopperName": {
+				"firstName":"'.$buyer_name.'"
+			},
+			"shopperEmail": "'.$buyer_email.'",
+			"shopperLocale": "en-US",
+			"billingAddress": {
+				"city":"Ankeborg",
+				"country":"SE",
+				"houseNumberOrName":"1",
+				"postalCode":"12345",
+				"street":"Stargatan"
+   			}
+
 		}';
 
 		$ch = curl_init();
